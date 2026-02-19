@@ -68,14 +68,18 @@ function attachStaticListeners() {
 // ── Load & Render ──
 
 async function loadAndRender() {
-  const res = await sendMessage({ action: "getSessions" });
+  const [res, currentTabs] = await Promise.all([
+    sendMessage({ action: "getSessions" }),
+    chrome.tabs.query({ currentWindow: true }),
+  ]);
   if (res.success) {
     allSessions = res.sessions;
-    renderSessions(allSessions);
+    const currentUrls = new Set(currentTabs.map((t) => t.url));
+    renderSessions(allSessions, currentUrls);
   }
 }
 
-function renderSessions(sessions) {
+function renderSessions(sessions, currentUrls = new Set()) {
   const query = document.getElementById("search").value.trim().toLowerCase();
   const list = document.getElementById("session-list");
   list.innerHTML = "";
@@ -97,22 +101,25 @@ function renderSessions(sessions) {
   }
 
   for (const session of entries) {
-    list.appendChild(buildSessionCard(session));
+    list.appendChild(buildSessionCard(session, currentUrls));
   }
 }
 
-function buildSessionCard(session) {
+function buildSessionCard(session, currentUrls = new Set()) {
   const card = document.createElement("div");
-  card.className = "session-card";
   card.dataset.id = session.id;
+
+  const isActive = session.tabs.length > 0 && session.tabs.every((tab) => currentUrls.has(tab.url));
+  card.className = "session-card" + (isActive ? " session-card--active" : "");
 
   const tabWord = session.tabs.length === 1 ? "tab" : "tabs";
   const date = formatDate(session.createdAt);
+  const activeDot = isActive ? `<span class="active-dot" title="This session is currently open">●</span> ` : "";
 
   card.innerHTML = `
     <div class="session-info">
       <div class="session-name" title="${escapeHtml(session.name)}">${escapeHtml(session.name)}</div>
-      <div class="session-meta">${session.tabs.length} ${tabWord} · ${date}</div>
+      <div class="session-meta">${activeDot}${session.tabs.length} ${tabWord} · ${date}</div>
     </div>
     <button class="session-menu-btn" title="Options" aria-label="Options for ${escapeHtml(session.name)}">⋯</button>
   `;

@@ -379,3 +379,14 @@ footer .btn {
 .toast.fade-out {
   opacity: 0;
 }
+
+/* ── Active session indicator ── */
+.session-card--active {
+  border-left: 3px solid var(--accent);
+  padding-left: 13px; /* 16px - 3px border */
+}
+
+.active-dot {
+  color: var(--accent);
+  font-size: 10px;
+}
