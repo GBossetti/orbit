@@ -30,6 +30,14 @@ async function handleMessage(message) {
   }
 }
 
+// --- URL validation ---
+
+function isSafeUrl(url) {
+  if (!url || typeof url !== "string") return false;
+  const blocked = ["chrome://", "chrome-extension://", "about:", "edge://", "brave://", "javascript:", "data:"];
+  return !blocked.some((prefix) => url.startsWith(prefix));
+}
+
 // --- Storage helpers ---
 
 async function readSessions() {
@@ -55,7 +63,7 @@ async function saveSession(name) {
 
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const filteredTabs = tabs
-    .filter((tab) => tab.url && !tab.url.startsWith("chrome://") && !tab.url.startsWith("chrome-extension://") && !tab.url.startsWith("about:") && !tab.url.startsWith("edge://") && !tab.url.startsWith("brave://"))
+    .filter((tab) => isSafeUrl(tab.url))
     .map((tab) => ({ url: tab.url, title: tab.title || tab.url }));
 
   if (filteredTabs.length === 0) {
@@ -91,6 +99,7 @@ async function restoreSession(sessionId, closeCurrentTabs) {
   }
 
   for (const tab of session.tabs) {
+    if (!isSafeUrl(tab.url)) continue;
     await chrome.tabs.create({ url: tab.url });
   }
 
@@ -134,10 +143,17 @@ async function importSessions(data) {
   let imported = 0;
 
   for (const [id, session] of Object.entries(data.sessions)) {
-    if (!existing[id]) {
-      existing[id] = session;
-      imported++;
-    }
+    if (existing[id]) continue;
+    if (
+      typeof session.id !== "string" ||
+      typeof session.name !== "string" ||
+      typeof session.createdAt !== "number" ||
+      !Array.isArray(session.tabs)
+    ) continue;
+
+    const safeTabs = session.tabs.filter((tab) => typeof tab.url === "string" && isSafeUrl(tab.url));
+    existing[id] = { ...session, tabs: safeTabs };
+    imported++;
   }
 
   await writeSessions(existing);
