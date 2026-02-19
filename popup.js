@@ -54,6 +54,9 @@ function attachStaticListeners() {
   // Restore modal confirm
   document.getElementById("restore-confirm").addEventListener("click", doRestoreSession);
 
+  // Update modal confirm
+  document.getElementById("update-confirm").addEventListener("click", doUpdateSession);
+
   // Close any open dropdown when clicking elsewhere
   document.addEventListener("click", (e) => {
     if (activeDropdown && !activeDropdown.contains(e.target)) {
@@ -137,6 +140,7 @@ function toggleDropdown(session, anchorEl) {
 
   const items = [
     { label: "Restore", action: () => showRestoreModal(session) },
+    { label: "Update", action: () => showUpdateModal(session) },
     { label: "Rename", action: () => showRenameModal(session) },
     { label: "Delete", action: () => doDeleteSession(session), danger: true },
   ];
@@ -260,6 +264,33 @@ async function doRestoreSession() {
     window.close();
   } else {
     showToast(res.error || "Could not restore session.");
+  }
+}
+
+// ── Update session ──
+
+let pendingUpdateSession = null;
+
+function showUpdateModal(session) {
+  hideAllModals();
+  pendingUpdateSession = session;
+  const tabWord = session.tabs.length === 1 ? "tab" : "tabs";
+  document.getElementById("update-title").textContent = `Update "${session.name}"`;
+  document.getElementById("update-sub").textContent =
+    `Replace the ${session.tabs.length} saved ${tabWord} with your current open tabs?`;
+  showModal("modal-update");
+}
+
+async function doUpdateSession() {
+  const res = await sendMessage({ action: "updateSession", sessionId: pendingUpdateSession.id });
+  if (res.success) {
+    hideAllModals();
+    allSessions[res.session.id] = res.session;
+    renderSessions(allSessions);
+    const tabWord = res.session.tabs.length === 1 ? "tab" : "tabs";
+    showToast(`"${res.session.name}" updated (${res.session.tabs.length} ${tabWord})`);
+  } else {
+    showToast(res.error || "Could not update session.");
   }
 }
 

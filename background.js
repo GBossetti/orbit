@@ -25,6 +25,8 @@ async function handleMessage(message) {
       return exportSessions();
     case "importSessions":
       return importSessions(message.data);
+    case "updateSession":
+      return updateSession(message.sessionId);
     default:
       throw new Error(`Unknown action: ${message.action}`);
   }
@@ -114,6 +116,26 @@ async function restoreSession(sessionId, closeCurrentTabs) {
 
   const skipped = session.tabs.length - safeTabs.length;
   return { success: true, skipped };
+}
+
+async function updateSession(sessionId) {
+  const sessions = await readSessions();
+  if (!sessions[sessionId]) {
+    throw new Error("Session not found.");
+  }
+
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const filteredTabs = tabs
+    .filter((tab) => isSafeUrl(tab.url))
+    .map((tab) => ({ url: tab.url, title: tab.title || tab.url }));
+
+  if (filteredTabs.length === 0) {
+    throw new Error("No saveable tabs found in the current window.");
+  }
+
+  sessions[sessionId].tabs = filteredTabs;
+  await writeSessions(sessions);
+  return { success: true, session: sessions[sessionId] };
 }
 
 async function deleteSession(sessionId) {
