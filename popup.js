@@ -4,6 +4,8 @@
 // ── State ──
 let allSessions = {}; // cached from storage, keyed by id
 let activeDropdown = null; // currently open dropdown element
+let currentActiveSessionId = null; // ID of the last restored session
+let currentUrlSet = new Set(); // current tab URLs, refreshed on load
 
 // ── Init ──
 document.addEventListener("DOMContentLoaded", () => {
@@ -17,7 +19,7 @@ function attachStaticListeners() {
 
   // Search
   document.getElementById("search").addEventListener("input", () => {
-    renderSessions(allSessions);
+    renderSessions(allSessions, currentUrlSet, currentActiveSessionId);
   });
 
   // Footer
@@ -57,6 +59,12 @@ function attachStaticListeners() {
   // Update modal confirm
   document.getElementById("update-confirm").addEventListener("click", doUpdateSession);
 
+  // Unsaved banner Update button
+  document.getElementById("unsaved-update").addEventListener("click", () => {
+    const session = allSessions[currentActiveSessionId];
+    if (session) showUpdateModal(session);
+  });
+
   // Close any open dropdown when clicking elsewhere
   document.addEventListener("click", (e) => {
     if (activeDropdown && !activeDropdown.contains(e.target)) {
@@ -74,15 +82,31 @@ async function loadAndRender() {
   ]);
   if (res.success) {
     allSessions = res.sessions;
-    const currentUrls = new Set(currentTabs.map((t) => t.url));
-    renderSessions(allSessions, currentUrls);
+    currentUrlSet = new Set(currentTabs.map((t) => t.url));
+    currentActiveSessionId = res.activeSessionId;
+    renderSessions(allSessions, currentUrlSet, currentActiveSessionId);
   }
 }
 
-function renderSessions(sessions, currentUrls = new Set()) {
+function renderSessions(sessions, currentUrls = new Set(), activeSessionId = null) {
   const query = document.getElementById("search").value.trim().toLowerCase();
   const list = document.getElementById("session-list");
   list.innerHTML = "";
+
+  // Show/hide unsaved-changes banner
+  const activeSession = activeSessionId ? sessions[activeSessionId] : null;
+  const isModified = activeSession && !(
+    activeSession.tabs.length === currentUrls.size &&
+    activeSession.tabs.every((tab) => currentUrls.has(tab.url))
+  );
+  const banner = document.getElementById("unsaved-banner");
+  if (isModified) {
+    document.getElementById("unsaved-text").textContent =
+      `"${activeSession.name}" has unsaved changes`;
+    banner.classList.remove("hidden");
+  } else {
+    banner.classList.add("hidden");
+  }
 
   const entries = Object.values(sessions)
     .filter((s) => !query || s.name.toLowerCase().includes(query))
@@ -101,20 +125,39 @@ function renderSessions(sessions, currentUrls = new Set()) {
   }
 
   for (const session of entries) {
-    list.appendChild(buildSessionCard(session, currentUrls));
+    list.appendChild(buildSessionCard(session, currentUrls, activeSessionId));
   }
 }
 
-function buildSessionCard(session, currentUrls = new Set()) {
+function buildSessionCard(session, currentUrls = new Set(), activeSessionId = null) {
   const card = document.createElement("div");
   card.dataset.id = session.id;
 
-  const isActive = session.tabs.length > 0 && session.tabs.every((tab) => currentUrls.has(tab.url));
-  card.className = "session-card" + (isActive ? " session-card--active" : "");
+  const isTracked = session.id === activeSessionId;
+  const tabsMatch = session.tabs.length > 0 &&
+    session.tabs.length === currentUrls.size &&
+    session.tabs.every((tab) => currentUrls.has(tab.url));
+
+  const isClean    = isTracked && tabsMatch;   // restored, no changes
+  const isModified = isTracked && !tabsMatch;  // restored, tabs changed
+  const isExact    = !isTracked && tabsMatch;  // exact match, not explicitly restored
+
+  let cardClass = "session-card";
+  let dotClass = "active-dot";
+  if (isClean || isExact) {
+    cardClass += " session-card--active";
+  } else if (isModified) {
+    cardClass += " session-card--modified";
+    dotClass += " active-dot--modified";
+  }
+  card.className = cardClass;
 
   const tabWord = session.tabs.length === 1 ? "tab" : "tabs";
   const date = formatDate(session.createdAt);
-  const activeDot = isActive ? `<span class="active-dot" title="This session is currently open">●</span> ` : "";
+  const showDot = isClean || isExact || isModified;
+  const activeDot = showDot
+    ? `<span class="${dotClass}" title="This session is currently open">●</span> `
+    : "";
 
   card.innerHTML = `
     <div class="session-info">
@@ -202,7 +245,7 @@ async function doSaveSession() {
   if (res.success) {
     hideAllModals();
     allSessions = { ...allSessions, [res.session.id]: res.session };
-    renderSessions(allSessions);
+    renderSessions(allSessions, currentUrlSet, currentActiveSessionId);
     showToast(`Saved "${res.session.name}"`);
   } else {
     showError("save-error", res.error || "Could not save session.");
@@ -235,7 +278,7 @@ async function doRenameSession() {
   if (res.success) {
     hideAllModals();
     allSessions[pendingRenameId].name = newName;
-    renderSessions(allSessions);
+    renderSessions(allSessions, currentUrlSet, currentActiveSessionId);
     showToast("Session renamed");
   } else {
     showError("rename-error", res.error || "Could not rename session.");
@@ -293,7 +336,7 @@ async function doUpdateSession() {
   if (res.success) {
     hideAllModals();
     allSessions[res.session.id] = res.session;
-    renderSessions(allSessions);
+    renderSessions(allSessions, currentUrlSet, currentActiveSessionId);
     const tabWord = res.session.tabs.length === 1 ? "tab" : "tabs";
     showToast(`"${res.session.name}" updated (${res.session.tabs.length} ${tabWord})`);
   } else {
@@ -307,7 +350,8 @@ async function doDeleteSession(session) {
   const res = await sendMessage({ action: "deleteSession", sessionId: session.id });
   if (res.success) {
     delete allSessions[session.id];
-    renderSessions(allSessions);
+    if (currentActiveSessionId === session.id) currentActiveSessionId = null;
+    renderSessions(allSessions, currentUrlSet, currentActiveSessionId);
     showToast(`Deleted "${session.name}"`);
   } else {
     showToast(res.error || "Could not delete session.");

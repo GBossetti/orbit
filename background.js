@@ -55,7 +55,8 @@ async function writeSessions(sessions) {
 
 async function getSessions() {
   const sessions = await readSessions();
-  return { success: true, sessions };
+  const { activeSessionId } = await chrome.storage.local.get("activeSessionId");
+  return { success: true, sessions, activeSessionId: activeSessionId ?? null };
 }
 
 async function saveSession(name) {
@@ -114,6 +115,8 @@ async function restoreSession(sessionId, closeCurrentTabs) {
     await chrome.tabs.remove(tabsToClose);
   }
 
+  await chrome.storage.local.set({ activeSessionId: sessionId });
+
   const skipped = session.tabs.length - safeTabs.length;
   return { success: true, skipped };
 }
@@ -145,6 +148,10 @@ async function deleteSession(sessionId) {
   }
   delete sessions[sessionId];
   await writeSessions(sessions);
+  const { activeSessionId } = await chrome.storage.local.get("activeSessionId");
+  if (activeSessionId === sessionId) {
+    await chrome.storage.local.remove("activeSessionId");
+  }
   return { success: true };
 }
 
