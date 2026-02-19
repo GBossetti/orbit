@@ -101,8 +101,9 @@ function renderSessions(sessions, currentUrls = new Set(), activeSessionId = nul
   );
   const banner = document.getElementById("unsaved-banner");
   if (isModified) {
+    const tabCount = currentUrls.size;
     document.getElementById("unsaved-text").textContent =
-      `"${activeSession.name}" has unsaved changes`;
+      `"${activeSession.name}" has unsaved changes · ${tabCount} tab${tabCount !== 1 ? "s" : ""} open`;
     banner.classList.remove("hidden");
   } else {
     banner.classList.add("hidden");
