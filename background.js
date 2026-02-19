@@ -90,20 +90,30 @@ async function restoreSession(sessionId, closeCurrentTabs) {
     throw new Error("Session not found.");
   }
 
-  if (closeCurrentTabs) {
-    const currentTabs = await chrome.tabs.query({ currentWindow: true });
-    const tabIds = currentTabs.map((tab) => tab.id);
-    if (tabIds.length > 0) {
-      await chrome.tabs.remove(tabIds);
-    }
+  const safeTabs = session.tabs.filter((tab) => isSafeUrl(tab.url));
+  if (safeTabs.length === 0) {
+    throw new Error("No restorable tabs in this session.");
   }
 
-  for (const tab of session.tabs) {
-    if (!isSafeUrl(tab.url)) continue;
+  // Snapshot old tab IDs BEFORE opening new ones
+  let tabsToClose = [];
+  if (closeCurrentTabs) {
+    const currentTabs = await chrome.tabs.query({ currentWindow: true });
+    tabsToClose = currentTabs.map((tab) => tab.id);
+  }
+
+  // Create new tabs first — window stays alive
+  for (const tab of safeTabs) {
     await chrome.tabs.create({ url: tab.url });
   }
 
-  return { success: true };
+  // Close old tabs only after new ones exist
+  if (tabsToClose.length > 0) {
+    await chrome.tabs.remove(tabsToClose);
+  }
+
+  const skipped = session.tabs.length - safeTabs.length;
+  return { success: true, skipped };
 }
 
 async function deleteSession(sessionId) {
