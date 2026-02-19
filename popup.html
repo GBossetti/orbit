@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orbit</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <span class="logo">Orbit</span>
+    <button id="btn-new" class="btn btn-primary">+ New</button>
+  </header>
+
+  <!-- Search -->
+  <div class="search-wrap">
+    <input id="search" type="text" placeholder="Search sessions…" autocomplete="off" />
+  </div>
+
+  <!-- Session list -->
+  <main id="session-list">
+    <!-- Populated by popup.js -->
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <button id="btn-import" class="btn btn-ghost">Import</button>
+    <button id="btn-export" class="btn btn-ghost">Export All</button>
+    <input id="import-file" type="file" accept=".json" hidden />
+  </footer>
+
+  <!-- ── Modals ── -->
+
+  <!-- Save modal -->
+  <div id="modal-save" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="save-title">
+    <div class="modal">
+      <h2 id="save-title">New Session</h2>
+      <p class="modal-sub">Save your current tabs as a named session.</p>
+      <input id="save-name" type="text" placeholder="e.g. Job Search" maxlength="80" autocomplete="off" />
+      <p id="save-error" class="field-error hidden"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost modal-cancel">Cancel</button>
+        <button id="save-confirm" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename modal -->
+  <div id="modal-rename" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="rename-title">
+    <div class="modal">
+      <h2 id="rename-title">Rename Session</h2>
+      <input id="rename-name" type="text" maxlength="80" autocomplete="off" />
+      <p id="rename-error" class="field-error hidden"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost modal-cancel">Cancel</button>
+        <button id="rename-confirm" class="btn btn-primary">Rename</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Restore modal -->
+  <div id="modal-restore" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="restore-title">
+    <div class="modal">
+      <h2 id="restore-title">Restore Session</h2>
+      <p class="modal-sub">What should happen to your current tabs?</p>
+      <div class="radio-group">
+        <label class="radio-option">
+          <input type="radio" name="restore-mode" value="close" checked />
+          <span>
+            <strong>Close current tabs</strong>
+            <small>Replace current tabs with this session</small>
+          </span>
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="restore-mode" value="keep" />
+          <span>
+            <strong>Keep current tabs open</strong>
+            <small>Open this session on top of existing tabs</small>
+          </span>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost modal-cancel">Cancel</button>
+        <button id="restore-confirm" class="btn btn-primary">Restore</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
