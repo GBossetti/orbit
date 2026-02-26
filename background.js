@@ -98,21 +98,24 @@ async function restoreSession(sessionId, closeCurrentTabs) {
     throw new Error("No restorable tabs in this session.");
   }
 
-  // Snapshot old tab IDs BEFORE opening new ones
-  let tabsToClose = [];
   if (closeCurrentTabs) {
     const currentTabs = await chrome.tabs.query({ currentWindow: true });
-    tabsToClose = currentTabs.map((tab) => tab.id);
-  }
+    const tabsToClose = currentTabs.map((tab) => tab.id);
 
-  // Create new tabs first — window stays alive
-  for (const tab of safeTabs) {
-    await chrome.tabs.create({ url: tab.url });
-  }
-
-  // Close old tabs only after new ones exist
-  if (tabsToClose.length > 0) {
+    // Open the first session tab to anchor the window, then close old tabs,
+    // then open the rest — so old and new sessions never fully coexist.
+    await chrome.tabs.create({ url: safeTabs[0].url, active: true });
     await chrome.tabs.remove(tabsToClose);
+
+    if (safeTabs.length > 1) {
+      await Promise.all(
+        safeTabs.slice(1).map((tab) => chrome.tabs.create({ url: tab.url, active: false }))
+      );
+    }
+  } else {
+    await Promise.all(
+      safeTabs.map((tab) => chrome.tabs.create({ url: tab.url, active: false }))
+    );
   }
 
   await chrome.storage.local.set({ activeSessionId: sessionId });
