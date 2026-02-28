@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Orbit",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A local tab session manager. Save, restore, and organize your tabs into named sessions.",
   "permissions": ["tabs", "storage"],
   "action": {

@@ -208,13 +208,20 @@ function toggleDropdown(session, anchorEl) {
     menu.appendChild(btn);
   }
 
-  // Position below the anchor
+  // Position the menu: prefer below the anchor, flip upward if it would be clipped
   const rect = anchorEl.getBoundingClientRect();
-  menu.style.top = rect.bottom + 4 + "px";
   menu.style.right = document.body.clientWidth - rect.right + "px";
 
   document.body.appendChild(menu);
   activeDropdown = menu;
+
+  const menuHeight = menu.offsetHeight;
+  const spaceBelow = document.documentElement.clientHeight - rect.bottom - 4;
+  if (spaceBelow >= menuHeight) {
+    menu.style.top = rect.bottom + 4 + "px";
+  } else {
+    menu.style.top = rect.top - menuHeight - 4 + "px";
+  }
 }
 
 function closeDropdown() {
