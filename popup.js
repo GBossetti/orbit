@@ -4,7 +4,6 @@
 // ── State ──
 let allSessions = {}; // cached from storage, keyed by id
 let activeDropdown = null; // currently open dropdown element
-let closeTimer = null;    // timer to delay dropdown close on hover
 let currentActiveSessionId = null; // ID of the last restored session
 let currentUrlSet = new Set(); // current tab URLs, refreshed on load
 
@@ -163,12 +162,9 @@ function buildSessionCard(session, currentUrls = new Set(), activeSessionId = nu
   `;
 
   const menuBtn = card.querySelector(".session-menu-btn");
-  menuBtn.addEventListener("mouseenter", () => {
-    clearTimeout(closeTimer);
+  menuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
     openDropdown(session, menuBtn);
-  });
-  menuBtn.addEventListener("mouseleave", () => {
-    closeTimer = setTimeout(closeDropdown, 100);
   });
 
   return card;
@@ -178,7 +174,9 @@ function buildSessionCard(session, currentUrls = new Set(), activeSessionId = nu
 
 function openDropdown(session, anchorEl) {
   if (activeDropdown) {
+    const isSame = activeDropdown.dataset.sessionId === session.id;
     closeDropdown();
+    if (isSame) return;
   }
 
   const menu = document.createElement("div");
@@ -211,10 +209,7 @@ function openDropdown(session, anchorEl) {
   document.body.appendChild(menu);
   activeDropdown = menu;
 
-  menu.addEventListener("mouseenter", () => clearTimeout(closeTimer));
-  menu.addEventListener("mouseleave", () => {
-    closeTimer = setTimeout(closeDropdown, 100);
-  });
+  menu.addEventListener("mouseleave", () => closeDropdown());
 
   const menuHeight = menu.offsetHeight;
   const spaceBelow = document.documentElement.clientHeight - rect.bottom - 4;
