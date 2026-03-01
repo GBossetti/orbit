@@ -4,6 +4,7 @@
 // ── State ──
 let allSessions = {}; // cached from storage, keyed by id
 let activeDropdown = null; // currently open dropdown element
+let closeTimer = null;    // timer to delay dropdown close on hover
 let currentActiveSessionId = null; // ID of the last restored session
 let currentUrlSet = new Set(); // current tab URLs, refreshed on load
 
@@ -63,13 +64,6 @@ function attachStaticListeners() {
   document.getElementById("unsaved-update").addEventListener("click", () => {
     const session = allSessions[currentActiveSessionId];
     if (session) showUpdateModal(session);
-  });
-
-  // Close any open dropdown when clicking elsewhere
-  document.addEventListener("click", (e) => {
-    if (activeDropdown && !activeDropdown.contains(e.target)) {
-      closeDropdown();
-    }
   });
 }
 
@@ -168,9 +162,13 @@ function buildSessionCard(session, currentUrls = new Set(), activeSessionId = nu
     <button class="session-menu-btn" title="Options" aria-label="Options for ${escapeHtml(session.name)}">⋯</button>
   `;
 
-  card.querySelector(".session-menu-btn").addEventListener("click", (e) => {
-    e.stopPropagation();
-    toggleDropdown(session, e.currentTarget);
+  const menuBtn = card.querySelector(".session-menu-btn");
+  menuBtn.addEventListener("mouseenter", () => {
+    clearTimeout(closeTimer);
+    openDropdown(session, menuBtn);
+  });
+  menuBtn.addEventListener("mouseleave", () => {
+    closeTimer = setTimeout(closeDropdown, 100);
   });
 
   return card;
@@ -178,11 +176,9 @@ function buildSessionCard(session, currentUrls = new Set(), activeSessionId = nu
 
 // ── Dropdown menu ──
 
-function toggleDropdown(session, anchorEl) {
+function openDropdown(session, anchorEl) {
   if (activeDropdown) {
-    const isSame = activeDropdown.dataset.sessionId === session.id;
     closeDropdown();
-    if (isSame) return; // clicking same button closes it
   }
 
   const menu = document.createElement("div");
@@ -214,6 +210,11 @@ function toggleDropdown(session, anchorEl) {
 
   document.body.appendChild(menu);
   activeDropdown = menu;
+
+  menu.addEventListener("mouseenter", () => clearTimeout(closeTimer));
+  menu.addEventListener("mouseleave", () => {
+    closeTimer = setTimeout(closeDropdown, 100);
+  });
 
   const menuHeight = menu.offsetHeight;
   const spaceBelow = document.documentElement.clientHeight - rect.bottom - 4;
