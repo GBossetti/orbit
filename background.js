@@ -16,7 +16,7 @@ async function handleMessage(message) {
     case "saveSession":
       return saveSession(message.name);
     case "restoreSession":
-      return restoreSession(message.sessionId, message.closeCurrentTabs);
+      return restoreSession(message.sessionId, message.closeCurrentTabs, message.openInNewWindow);
     case "deleteSession":
       return deleteSession(message.sessionId);
     case "renameSession":
@@ -67,7 +67,7 @@ async function saveSession(name) {
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const filteredTabs = tabs
     .filter((tab) => isSafeUrl(tab.url))
-    .map((tab) => ({ url: tab.url, title: tab.title || tab.url }));
+    .map((tab) => ({ url: tab.url, title: tab.title || tab.url, pinned: tab.pinned || false }));
 
   if (filteredTabs.length === 0) {
     throw new Error("No saveable tabs found in the current window.");
@@ -86,7 +86,7 @@ async function saveSession(name) {
   return { success: true, session: sessions[id] };
 }
 
-async function restoreSession(sessionId, closeCurrentTabs) {
+async function restoreSession(sessionId, closeCurrentTabs, openInNewWindow) {
   const sessions = await readSessions();
   const session = sessions[sessionId];
   if (!session) {
@@ -98,23 +98,34 @@ async function restoreSession(sessionId, closeCurrentTabs) {
     throw new Error("No restorable tabs in this session.");
   }
 
-  if (closeCurrentTabs) {
+  // Sort: pinned tabs first so Chrome places them correctly at the left
+  safeTabs.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+
+  if (openInNewWindow) {
+    const newWin = await chrome.windows.create({ url: safeTabs[0].url, focused: true });
+    if (safeTabs[0].pinned) {
+      await chrome.tabs.update(newWin.tabs[0].id, { pinned: true });
+    }
+    for (const tab of safeTabs.slice(1)) {
+      await chrome.tabs.create({ windowId: newWin.id, url: tab.url, active: false, pinned: tab.pinned });
+    }
+  } else if (closeCurrentTabs) {
     const currentTabs = await chrome.tabs.query({ currentWindow: true });
     const tabsToClose = currentTabs.map((tab) => tab.id);
 
     // Open the first session tab to anchor the window, then close old tabs,
     // then open the rest — so old and new sessions never fully coexist.
-    await chrome.tabs.create({ url: safeTabs[0].url, active: true });
+    await chrome.tabs.create({ url: safeTabs[0].url, active: true, pinned: safeTabs[0].pinned });
     await chrome.tabs.remove(tabsToClose);
 
     if (safeTabs.length > 1) {
       await Promise.all(
-        safeTabs.slice(1).map((tab) => chrome.tabs.create({ url: tab.url, active: false }))
+        safeTabs.slice(1).map((tab) => chrome.tabs.create({ url: tab.url, active: false, pinned: tab.pinned }))
       );
     }
   } else {
     await Promise.all(
-      safeTabs.map((tab) => chrome.tabs.create({ url: tab.url, active: false }))
+      safeTabs.map((tab) => chrome.tabs.create({ url: tab.url, active: false, pinned: tab.pinned }))
     );
   }
 
@@ -133,7 +144,7 @@ async function updateSession(sessionId) {
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const filteredTabs = tabs
     .filter((tab) => isSafeUrl(tab.url))
-    .map((tab) => ({ url: tab.url, title: tab.title || tab.url }));
+    .map((tab) => ({ url: tab.url, title: tab.title || tab.url, pinned: tab.pinned || false }));
 
   if (filteredTabs.length === 0) {
     throw new Error("No saveable tabs found in the current window.");

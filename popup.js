@@ -305,11 +305,13 @@ function showRestoreModal(session) {
 async function doRestoreSession() {
   const mode = document.querySelector('input[name="restore-mode"]:checked').value;
   const closeCurrentTabs = mode === "close";
+  const openInNewWindow  = mode === "new-window";
 
   const res = await sendMessage({
     action: "restoreSession",
     sessionId: pendingRestoreSession.id,
     closeCurrentTabs,
+    openInNewWindow,
   });
 
   if (res.success) {
